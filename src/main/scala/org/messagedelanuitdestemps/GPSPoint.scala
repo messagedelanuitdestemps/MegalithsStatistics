@@ -1,8 +1,9 @@
+package org.messagedelanuitdestemps.anglestest
+
+
 import math._
 import scala.io.Source
 
-val EarthMeanRadius = 6367.532
-val Pi = 3.141592653589793
 
 
 class GpsPoint(csvLine: String) {
@@ -10,6 +11,9 @@ class GpsPoint(csvLine: String) {
     val latitude: Double = position._1
     val longitude: Double = position._2
     val name: String = position._3
+	val EarthMeanRadius = 6367.532
+	val Pi = 3.141592653589793
+
 
 
 	private[this] def toCartesianVect(lat1rp : Double, lon1rp : Double) = {

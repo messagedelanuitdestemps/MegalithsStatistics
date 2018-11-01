@@ -1,5 +1,7 @@
+package org.messagedelanuitdestemps.anglestest
 
-
+import scala.io.Source
+import Math._
 
 class CollectionGpsPoints(csvFile: String) {
     val gpsPoints: List[GpsPoint] = Source.fromFile(csvFile).getLines().toList.map {e => new GpsPoint(e)}
@@ -28,20 +30,21 @@ class CollectionGpsPoints(csvFile: String) {
         }}
     }
 
-	def allUnorderedCoupleOfPointsCountAngles(function: (GpsPoint, GpsPoint) => Double, precision :  Double) = {
+	def allUnorderedCoupleOfPointsCountAngles(function: (GpsPoint, GpsPoint) => Double, precision :  Double) : Int = {
 	   def precisionTo(val1 : Double, val2 : Double, precision : Double) : Boolean = {
 			(val1 - val2).abs < precision
 	   }
 	   def testAngles(ang : Double, precision : Double) : Boolean = {
 			(precisionTo(ang,0.0,precision) && precisionTo(ang,90.0,precision) && precisionTo(ang,45.0,precision) && 
-			 precisionTo(ang,26.56,precision) && precisionTo(ang, 18.43)  &&  precisionTo(ang,14.04,precision) && precisionTo(ang,11.31,precision) &&
+			 precisionTo(ang,26.56,precision) && precisionTo(ang, 18.43,precision)  &&  precisionTo(ang,14.04,precision) && 
+			 precisionTo(ang,11.31,precision) &&
 			 precisionTo(ang,9.46,precision) && precisionTo(ang,8.13,precision) && precisionTo(ang,7.12,precision) && 
 			 precisionTo(ang,6.34,precision) && precisionTo(ang,33.69,precision) && precisionTo(ang,30.96,precision) && 
 			 precisionTo(ang,38.66,precision) && precisionTo(ang,35.54,precision) &&
-			 precisionTo(ang,36.87,precision) && precisionTo(ang,22.62,precision) && precisionTo(ang,16.26,precision)
+			 precisionTo(ang,36.87,precision) && precisionTo(ang,22.62,precision) && precisionTo(ang,16.26,precision) )
 		}
         val indexedPoints = this.gpsPoints.zipWithIndex
-        val angles = indexedPoints.flatMap { case (e1, i1) => if ( i2 > i1 && 
+        /*val angles = indexedPoints.flatMap { case (e1, i1) => if ( i2 > i1 && 
 													  (testAngles( function(e1, e2), precision)|| testAngles( function(e2, e1), precision) ) 
 													)
 										//println(e1.name.concat(" - ".concat(e2.name.concat(" : ".concat(function(e1, e2).toString)))))
@@ -49,12 +52,14 @@ class CollectionGpsPoints(csvFile: String) {
 									    else None
            // indexedPoints.filter  { case (e2, i2) => i2 > i1 }.map { case (e2, i2) => }
         }.sum // Là, on compte les angles remarquables
+	*/
+ 	1
     }
 
 
 
 	def calcNombreAnglesRemarquables(precision : Double) : Int = {
-		def 
+		1
 	}
 
 	def calcProba(nbrDoubletMesureAngleRemarquables : Int, nbmglt : Int, nbAnglRmq : Int, precision : Double) : Double = {
