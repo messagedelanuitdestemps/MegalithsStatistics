@@ -1,0 +1,29 @@
+import org.messagedelanuitdestemps.anglestest._
+import math._
+
+def dist = MenhirCombis.simpleDistance
+
+def generePtsAngles(taille : Int) = {
+	val pointsdist = (1 to taille).map { i =>  val pts = (random*4 +42 , random*4 - 2, random*4 +42 , random*4 - 2); val (a,b,c,d) = pts ; (pts, MenhirCombis.simpleDistance(a,b,c,d)) }.filter { case (a,d) => d > 1 && d < 100 }.toList
+	val res = pointsdist.map { case ((a,b,x,y),d) => val a1 = MenhirCombis.simpleAngle(a,b,x,y); val a2 = MenhirCombis.simpleAngle(a,b,x+0.0001,y+0.0001); (d,a1 - a2)}.sortWith { case ((d,a), (f,z)) =>  d < f}
+	res.foreach { case (d,dphi) => println(" distance = %f km => Δφ = %f".format(d,dphi))}
+}
+
+def generePtsAngles2(taille : Int) = {
+	val pointsdist = (1 to taille).map { i =>  val pts = (random*4 +42 , random*4 - 2, random*4 +42 , random*4 - 2); val (a,b,c,d) = pts ; (pts, MenhirCombis.simpleDistance(a,b,c,d)) }.filter { case (a,d) => d > 1 && d < 100 }.toList
+	val res = pointsdist.map { case ((a,b,x,y),d) => val (_,a1) = MenhirCombis.angle45(a,b,x,y); val (_,a2) = MenhirCombis.angle45(a,b,x+0.0001,y+0.0001); (d,a1 - a2)}.sortWith { case ((d,a), (f,z)) =>  d < f}
+	res.foreach { case (d,dphi) => println(" distance = %f km => Δφ = %f".format(d,dphi))}
+}
+
+
+def generePts(taille : Int) : List[GpsPoint] = {
+	//println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
+	(1 to taille).map { i =>  new GpsPoint("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 )) }.toList
+}
+
+
+def genereCollection(taille : Int) : CollectionGpsPoints = {
+	//println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
+	new CollectionGpsPoints((1 to taille).map { i =>  "%s %f N %f".format("toto", random*4 + 42 , random*4 - 2 ).toString }.toList.mkString("\n"))
+}
+

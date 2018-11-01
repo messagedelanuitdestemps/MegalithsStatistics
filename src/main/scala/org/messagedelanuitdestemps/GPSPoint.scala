@@ -85,7 +85,8 @@ class GpsPoint(csvLine: String) {
 	}
 
     def parseCsvLine(s: String): (Double, Double, String) = {
-        val regex = "(\\w+)\\s+(\\d+\\.\\d+)\\s+N\\s+(\\d+\\.\\d+)".r
+		println(s.replaceAll(",", "."))
+        val regex = "(\\w+)\\s+(\\d+\\.\\d+)\\s+N\\s+([\\d-]+\\.\\d+)".r
         val list = regex.findAllIn(s.replaceAll(",", ".")).matchData.toList.head.subgroups
         (list(1).toDouble, list.last.toDouble, list.head)
     }
