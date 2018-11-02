@@ -7,10 +7,10 @@ import scala.io.Source
 
 
 class GpsPoint(csvLine: String) {
-    val position: (Double, Double, String) = parseCsvLine(csvLine)
-    val latitude: Double = position._1
-    val longitude: Double = position._2
-    val name: String = position._3
+    var position: (Double, Double, String) = (0.0,0.0,"")//parseCsvLine(csvLine)
+    var latitude: Double = position._1
+    var longitude: Double = position._2
+    var name: String = position._3
 	val EarthMeanRadius = 6367.532
 	val Pi = 3.141592653589793
 
@@ -84,12 +84,24 @@ class GpsPoint(csvLine: String) {
 		roundAt(2)(angle45c)
 	}
 
-    def parseCsvLine(s: String): (Double, Double, String) = {
-		println(s.replaceAll(",", "."))
-        val regex = "(\\w+)\\s+(\\d+\\.\\d+)\\s+N\\s+([\\d-]+\\.\\d+)".r
-        val list = regex.findAllIn(s.replaceAll(",", ".")).matchData.toList.head.subgroups
-        (list(1).toDouble, list.last.toDouble, list.head)
+    def parseCsvLine(s: String) = {
+		//println(s.replaceAll(",", "."))
+        val regex = "([_\\w-]+)\\s+(\\d+\\.\\d+)\\s+N\\s+([\\d-]+\\.\\d+)\\s*".r
+        val list = regex.findAllIn(s).matchData.toList.head.subgroups
+        this.latitude = list(1).toDouble
+	   this.longitude = list.last.toDouble
+	   this.name =  list.head
     }
+
+   def fromDecimalGPSPoint(s: String) = {
+	   println(s)
+        val regex = """([_\w-]+)\s+(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
+        val list = regex.findAllIn(s).matchData.toList.head.subgroups
+        this.latitude = list(1).toDouble
+	   this.longitude = list.last.toDouble
+	   this.name =  list.head
+    }
+
 
     override def toString: String = {
         this.name.concat(" ".concat(this.longitude.toString.concat(" ".concat(this.latitude.toString))))

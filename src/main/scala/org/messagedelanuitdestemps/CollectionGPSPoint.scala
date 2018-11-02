@@ -5,32 +5,12 @@ import Math._
 
 class CollectionGpsPoints(csvFile: String) {
    // val gpsPoints: List[GpsPoint] = Source.fromFile(csvFile).getLines().toList.map {e => new GpsPoint(e)}
-    val gpsPoints: List[GpsPoint] = csvFile.split("\n").toList.map {e => new GpsPoint(e)}
+    var gpsPoints: List[GpsPoint] = csvFile.split("\n").toList.map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}
 
 
 	val listeAngleRemarquables = List(0.0, 90.0, 45.0, 26.56, 18.43, 14.04, 11.31, 9.46, 8.13, 7.12, 6.34, 33.69, 30.96, 38.66, 35.54, 36.87, 22.62, 16.26)
 
-    /*def iterateDistanceOnAllPoints = {
-        val indexedPoints = this.gpsPoints.zipWithIndex
-        indexedPoints.filter { case(e1, i1) => i1 < indexedPoints.length - 1}.map {case (e1, i1) => {
-            indexedPoints.filter  { case (e2, i2) => i2 > i1 }.map { case (e2, i2) => println(e1.name.concat(" - ".concat(e2.name.concat(" : ".concat(e1.simpleDistance(e2).toString))))) }
-        }}
-    }
-
-    def iterateOnAllUnorderedCoupleOfPoints(function: (GpsPoint, GpsPoint) => Double) = {
-        val indexedPoints = this.gpsPoints.zipWithIndex
-        indexedPoints.filter { case(e1, i1) => i1 < indexedPoints.length - 1}.map {case (e1, i1) => {
-            indexedPoints.filter  { case (e2, i2) => i2 > i1 }.map { case (e2, i2) => println(e1.name.concat(" - ".concat(e2.name.concat(" : ".concat(function(e1, e2).toString))))) }
-        }}
-    }
-
-    def iterateOnAllOrderedCoupleOfPoints(function: (GpsPoint, GpsPoint) => Double) = {
-        val indexedPoints = this.gpsPoints.zipWithIndex
-        indexedPoints.map {case (e1, i1) => {
-            indexedPoints.filter  { case (e2, i2) => i2 != i1 }.map { case (e2, i2) => println(e1.name.concat(" - ".concat(e2.name.concat(" : ".concat(function(e1, e2).toString))))) }
-        }}
-    }*/
-
+   
 	def calcNombreAnglesRemarquables( precision :  Double) : Int = {
 	   def precisionTo(val1 : Double, val2 : Double, precision : Double) : Boolean = {
 			(val1 - val2).abs < precision
@@ -53,7 +33,7 @@ class CollectionGpsPoints(csvFile: String) {
 
 	def calcProba(nbrDoubletMesureAngleRemarquables : Int, nbmglt : Int, nbAnglRmq : Int, precision : Double) : Double = {
 		def combinatoire ( n : BigDecimal, p : BigDecimal) : BigDecimal= {
-			println("Cn=%f p=%f".format(n,p))
+			//println("Cn=%f p=%f".format(n,p))
 			def fact(n : BigDecimal) : BigDecimal = { 
 					var result : BigDecimal = 1;
 					for (i  <- 1 to n.toInt) {
@@ -77,6 +57,8 @@ class CollectionGpsPoints(csvFile: String) {
      def calcProbaThis(precision : Double) : Double = {
 		calcProba(calcNombreAnglesRemarquables(precision), gpsPoints.size, listeAngleRemarquables.size, precision)
 	}
+
+	//TODO : Prendre des sous ensembles au hasard et construire le profil de proba de chacun d'entre eux pour cracher une sorte de courbe...
 
 }
 

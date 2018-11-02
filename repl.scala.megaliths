@@ -18,12 +18,12 @@ def generePtsAngles2(taille : Int) = {
 
 def generePts(taille : Int) : List[GpsPoint] = {
 	//println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
-	(1 to taille).map { i =>  new GpsPoint("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 )) }.toList
+	(1 to taille).map { i =>  new GpsPoint("%s %f N %f".format("toto", random +42 , random*4 - 2 )) }.toList
 }
 
 
 def genereCollection(taille : Int) : CollectionGpsPoints = {
 	//println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
-	new CollectionGpsPoints((1 to taille).map { i =>  "%s %f N %f".format("toto", random*4 + 42 , random*4 - 2 ).toString }.toList.mkString("\n"))
+	new CollectionGpsPoints((1 to taille).map { i =>  "%s %f, %f".formatLocal(java.util.Locale.US,"toto", random + 42 , random - 0.5 ).toString }.toList.mkString("\n"))
 }
 
