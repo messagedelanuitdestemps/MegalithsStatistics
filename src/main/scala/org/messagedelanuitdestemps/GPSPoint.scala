@@ -95,7 +95,7 @@ class GpsPoint(csvLine: String) {
 
    def fromDecimalGPSPoint(s: String) = {
 	   println(s)
-        val regex = """([_\w-]+)\s+(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
+        val regex = """(.+?)(?:\s*,\s*)(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
         val list = regex.findAllIn(s).matchData.toList.head.subgroups
         this.latitude = list(1).toDouble
 	   this.longitude = list.last.toDouble

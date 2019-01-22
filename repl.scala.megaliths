@@ -1,6 +1,6 @@
 import org.messagedelanuitdestemps.anglestest._
 import math._
-
+/*
 def dist = MenhirCombis.simpleDistance
 
 def generePtsAngles(taille : Int) = {
@@ -22,8 +22,31 @@ def generePts(taille : Int) : List[GpsPoint] = {
 }
 
 
+val csvloireatl = "Dolmen_de_la_Pierre_Couvretière  47.368700, -1.172800 \nPierre_de_la_Croterie 47.180967, -2.024793 \nMenhirs_des_Platennes 47.181591, -2.021710 \nMenhir_de_la_Pierre_Longue 47.287422, -2.530741 \nMenhir_de_la_Vacherie 47.309197, -2.061203 \nDolmen_de_Sandun 47.3494,-2.3419\nMenhir_de_Bissin 47.315996 , -2.393292\nDolmen_du_Riholo 47.4617,-2.2642\nMenhir_de_la_Pierre_blanche 47.354782 , -1.317834\nFuseau_de_la_Madeleine 47.436313 , -2.136545\nMenhirs_des_Dames_de_Pierre  47.125800, -1.576600 \nMenhir_des_Pierres_Velières  47.801200, -1.444400 \nMenhir_des_Louères 47.7195 , -1.495528\nPierre_de_Gargantua 47.263951 , -2.161429\nMenhir_de_Kerbourg  47.363849, -2.371720 \nMenhir_des_Faux 47.208216 , -2.102468"
+
+
+val csvauvergne = "Fichade	45.59887222,	3.12159722\nFreydefond	45.598785,	2.977458\nPineyre	45.597566,	2.982686\nFohet	45.64730833,	2.989127778\nCournol 45.64135833,	3.036438889\nLe_Parc	45.58141,	2.99439444\nSaillant	45.572861,	3.01448\nSt_Roch	45.58610278,	2.978294444\nRolland	45.56988, 3.019804\nJonas	45.53958889,	2.99905\nLoubaresse	45.51525278,	3.259391667\nBeaulieu	45.778282,	3.148408\nAubire	45.756808,	3.129945\nSarre 45.76999444,	3.12672222\nVillard	45.77718056,	3.03191111\nSapchat	45.579344,	2.973487\nMartinanche	45.640998,	3.502003\nRoche_Nite	45.471072,	3.001554"
+*/
 def genereCollection(taille : Int) : CollectionGpsPoints = {
 	//println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
 	new CollectionGpsPoints((1 to taille).map { i =>  "%s %f, %f".formatLocal(java.util.Locale.US,"toto", random + 42 , random - 0.5 ).toString }.toList.mkString("\n"))
 }
 
+def combinatoire ( n : BigDecimal, p : BigDecimal) : BigDecimal= {
+	println("Cn=%f p=%f".format(n,p))
+		def fact(n : BigDecimal) : BigDecimal = { 
+			var result : BigDecimal = 1;
+			for (i  <- 1 to n.toInt) {
+				result *= i;
+			}
+			result
+		}
+	fact(n)/(fact(n-p)*fact(p))
+}
+
+
+import scala.xml._
+
+val mens = (XML.loadFile("T4T35_France_Result.gpx") \ "wpt").map { e => ((e \("cmt")).text + "," + e \@("lat") + "," + e \@("lon"))}.mkString("\n")
+
+val menhirs = new CollectionGpsPoints(mens)
