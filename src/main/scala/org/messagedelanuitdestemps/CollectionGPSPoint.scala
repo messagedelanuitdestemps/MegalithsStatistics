@@ -7,7 +7,7 @@ import Math._
 
 class CollectionGpsPoints(csvFile: String) {
    // val gpsPoints: List[GpsPoint] = Source.fromFile(csvFile).getLines().toList.map {e => new GpsPoint(e)}
-    var gpsPoints: List[GpsPoint] = csvFile.split("\n").toList.map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}
+    var gpsPoints: List[GpsPoint] = csvFile.split("\n").filter( _.size >0).map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}.toList
 
 
 	val listeAngleRemarquables = List(0.0, 90.0, 45.0, 26.56, 18.43, 14.04, 11.31, 9.46, 8.13, 7.12, 6.34, 33.69, 30.96, 38.66, 35.54, 36.87, 22.62, 16.26)
@@ -124,6 +124,35 @@ class CollectionGpsPoints(csvFile: String) {
 			 calcProba(subgrp, tailleEchantillon, listeAngleRemarquables.size, precision)
 		}
      }
+
+     def genereRandomizedCollection(taille : Int) = {
+	     //println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
+	     this.gpsPoints =  (1 to taille).map { i =>  "%s, %f, %f".formatLocal(java.util.Locale.US,"toto", random + 42 , random - 0.5 ).toString }.toList.mkString("\n")
+		 .split("\n").toList.map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}
+     }
+
+
+
+
+    def compareProfilAvecGroupeControle(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int) : List[(Double, Double,Double)] = {
+		// 1. on lance le Monte-Carlo
+		val testMegalithOk = this.calcProbaForSubGroupMonteCarlo(precision, tailleEchantillon, tailleMaxATester)
+		// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
+		val grpControl = new CollectionGpsPoints("")
+		grpControl.genereRandomizedCollection(this.gpsPoints.size)
+		val testGroupeControl = grpControl.calcProbaForSubGroupMonteCarlo(precision, tailleEchantillon, tailleMaxATester)
+
+		println("")
+		// 3. On battit un petit histogramme.
+		val buglst = (1 to 4).toList
+		println(buglst)
+		val basepcent = 100.0/tailleMaxATester
+		buglst.map{ i : Int =>  
+				val exposant = pow(10,-i.toDouble)
+				println(" %d vs %d ".format(testMegalithOk.filter( _ < exposant).size, testGroupeControl.filter( _ < exposant).size))
+				(exposant, (basepcent*testMegalithOk.filter( _ < exposant).size), (basepcent*testGroupeControl.filter( _ < exposant).size))
+			     }
+    }
 
 
 
