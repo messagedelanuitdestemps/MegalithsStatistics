@@ -96,11 +96,33 @@ class GpsPoint(csvLine: String) {
    def fromDecimalGPSPoint(s: String) = {
 	   println(s)
         val regex = """(.+?)(?:\s*,\s*)(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
+	try {
         val list = regex.findAllIn(s).matchData.toList.head.subgroups
         this.latitude = list(1).toDouble
 	   this.longitude = list.last.toDouble
 	   this.name =  list.head
+	} catch { case e : Throwable => println("Regexp Failed: '"+ s+"'")}
     }
+
+   private def precisionTo(val1 : Double, val2 : Double, precision : Double) : Boolean = {
+	   (val1 - val2).abs < precision
+   }
+
+
+   private def testAngles(ang : Double, precision : Double) : Boolean = {
+			(precisionTo(ang,0.0,precision) || precisionTo(ang,90.0,precision) || precisionTo(ang,45.0,precision) || 
+			 precisionTo(ang,26.56,precision) || precisionTo(ang, 18.43,precision)  ||  precisionTo(ang,14.04,precision) || 
+			 precisionTo(ang,11.31,precision) ||
+			 precisionTo(ang,9.46,precision) || precisionTo(ang,8.13,precision) || precisionTo(ang,7.12,precision) || 
+			 precisionTo(ang,6.34,precision) || precisionTo(ang,33.69,precision) || precisionTo(ang,30.96,precision) || 
+			 precisionTo(ang,38.66,precision) || precisionTo(ang,35.54,precision) ||
+			 precisionTo(ang,36.87,precision) || precisionTo(ang,22.62,precision) || precisionTo(ang,16.26,precision) )
+   }
+
+   def isAngleRemarquable(point: GpsPoint, precision : Double) : Boolean = {
+	testAngles(this.simpleAngle(point),precision)
+   }
+
 
 
     override def toString: String = {
