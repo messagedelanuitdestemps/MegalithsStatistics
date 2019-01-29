@@ -130,7 +130,7 @@ class GpsPoint(csvLine: String) extends Cloneable {
     }
 
    def fromDecimalGPSPoint(s: String) = {
-	   println(s)
+	   //println(s)
 	   val regex = """(.+?)(?:\s*,\s*)(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
 	   try {
 		   val list = regex.findAllIn(s).matchData.toList.head.subgroups
@@ -165,7 +165,7 @@ class GpsPoint(csvLine: String) extends Cloneable {
 
 
     override def toString: String = {
-        this.name.concat(" ".concat(this.longitude.toString.concat(" ".concat(this.latitude.toString))))
+        this.name.concat(" ".concat(this.latitude.toString.concat(" ".concat(this.longitude.toString))))
     }
 }
 

@@ -7,12 +7,16 @@ import Math._
 //import scalaz.Memo
 import scala.collection.mutable._
 import scalaz._, Scalaz._
+import scala.xml._
+//import org.messagedelanuitdestemps.MyImplicits._
+
 
 class CollectionGpsPoints(csvFile: String) {
    // val gpsPoints: List[GpsPoint] = Source.fromFile(csvFile).getLines().toList.map {e => new GpsPoint(e)}
     var gpsPoints: List[GpsPoint] = csvFile.split("\n").filter( _.size >0).map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}.toList
     var gpsPointsBackup : List[GpsPoint] = List.empty
     var listeListLowProba : List[List[GpsPoint]] = List.empty
+    var listeGpsPointPlusCites : List[(GpsPoint,Int)] = List.empty
 
 
 	val listeAngleRemarquables = List(0.0, 90.0, 45.0, 26.56, 18.43, 14.04, 11.31, 9.46, 8.13, 7.12, 6.34, 33.69, 30.96, 38.66, 35.54, 36.87, 22.62, 16.26)
@@ -121,6 +125,12 @@ class CollectionGpsPoints(csvFile: String) {
 
 	}
 
+	def genereJSONAngleRemarquables(precision : Double) : String = {
+		val iPointsL =  allCombinations(2).toList
+		val selection = iPointsL.filter { case l => val a = l.apply(0); val b = l.apply(1); testAngles(a.simpleAngle(b), precision) ||  testAngles(b.simpleAngle(a), precision) }.
+				map {case l => (l.apply(0),l.apply(1))}
+		"const lines = [" + selection.map { case (a,b) => "[[%f,%f],[%f,%f]]".formatLocal(java.util.Locale.US,a.latitude,a.longitude,b.latitude,b.longitude) }.mkString(",")+ "];\n"
+	}
 
       
 
@@ -176,19 +186,49 @@ class CollectionGpsPoints(csvFile: String) {
 	     val o = new CollectionGpsPoints("")
 		     o.gpsPoints = this.gpsPoints
 		     o
-     } 
+     }
 
-    def compareProfilAvecGroupeControle(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
+    def updateMeilleur(lis : List[(GpsPoint,Int)]) = {
+
+
+	    def rightJoinOn[A,B]( l1 : List[A], l2 : List[B], pred : (A,B) => Boolean ) : List[(Option[A],B)] = {
+		    if (l1.size == 0 && l2.size > 0)
+			    l2.map { e => (None,e) }
+		    else {
+			    val res1 = for { b <- l2; a <- l1  } yield if (pred(a,b)) { (Some(a),b) } else {(None,b)}
+			    res1.flatMap { case (a,b) => if (! a.isDefined && res1.exists{ case (c,d) =>  b == d && c.isDefined} ) { None } else Some((a,b)) }.distinct
+                  }
+                }
+	
+
+	def joinMeilleurs( a : (GpsPoint,Int), b : (GpsPoint,Int)) : Boolean = { a._1 == b._1 }
+	if (listeGpsPointPlusCites.size == 0)
+		this.listeGpsPointPlusCites = lis
+	else {
+		this.listeGpsPointPlusCites = rightJoinOn(listeGpsPointPlusCites,lis, joinMeilleurs ).map{case (Some((g1,n1)),(g2,n2))  => (g1,n1+n2) 
+													  case (None, (g2,n2)  ) => (g2, n2) 
+												  	  }		
+	}
+    }
+
+    def compareProfilAvecGroupeControle(xmlsrc : String, precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
 		// 1. on lance le Monte-Carlo
 		val testMegalithOk = this.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
 		//println(this.listeListLowProba.reduce{ (a,b) => a.toSeq.intersect(b.toSeq).toList})
-		println(this.listeListLowProba.flatten.distinct.map { e=> (e,this.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse)
+		val meilleur = this.listeListLowProba.flatten.distinct.map { e=> (e,this.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse
+		this.listeGpsPointPlusCites = meilleur
+		println(meilleur.take(15))
+
 		// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
-		val grpControl = this.clone
+
+		val grpControl = new CollectionGpsPoints(loadGpx(xmlsrc))
+		//grpControl.gpsPoints = this.gpsPoints.to.toList
 		grpControl.randomizedThisCollection(minDegRandomization,maxDeg) //genereRandomizedCollection(this.gpsPoints.size)
 		val testGroupeControl = grpControl.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
-		this.gpsPoints = grpControl.gpsPointsBackup // Le clone a l'air de déconner, par ref ?
-		println(grpControl.listeListLowProba.flatten.distinct.map { e=> (e,grpControl.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse)
+		//this.gpsPoints = grpControl.gpsPointsBackup // Le clone a l'air de déconner, par ref ?
+		val gmeilleur = grpControl.listeListLowProba.flatten.distinct.map { e=> (e,grpControl.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse
+		grpControl.listeGpsPointPlusCites = gmeilleur
+		println(gmeilleur)
 
 		println("")
 		// 3. On batit un petit histogramme.
@@ -203,6 +243,32 @@ class CollectionGpsPoints(csvFile: String) {
 			     }
     }
 
+    def loadGpx(filename : String) : String =  (XML.loadFile(filename) \ "wpt").map { e => ( "%s, %s, %s".format( (e \("cmt")).text,  e \@("lat"),  e \@("lon")))}.mkString("\n")
+    
+
+
+    def runNProfiles(nbRun : Int,xmlsrc : String, precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
+        //this.gpsPoints = (new CollectionGpsPoints(loadGpx(xmlsrc))).gpsPoints
+	val ress : List[List[(Double, Double,Double)]] = (1 to nbRun).map { i =>
+		println("Run n°%d".format(i))
+		//this.gpsPoints = (new CollectionGpsPoints(loadGpx(xmlsrc))).gpsPoints
+		this.compareProfilAvecGroupeControle(xmlsrc,precision,tailleEchantillon,tailleMaxATester,minDegRandomization, maxDeg)
+		//List((1.0,2.0,3.0))
+	}.toList
+	println(this.listeGpsPointPlusCites)
+
+	(0 to 10).map { i => // Pour chaque coef
+	 val ec = (ress.map { e => e.apply(i)._2 }.sum)/nbRun
+	 val gc = (ress.map { e => e.apply(i)._3 }.sum)/nbRun
+	 (i.toDouble,ec,gc)
+	}.toList
+    }
+
+
+    def genereXmlMeilleur(nb : Int) : String = {
+	val l = this.listeGpsPointPlusCites.take(nb).map { case (g,n) => "<wpt lat=\"%f\" lon=\"%f\"><cmt>%s</cmt></wpt>".formatLocal(java.util.Locale.US,g.latitude,g.longitude,g.name)}
+	"<gpx>"+ l.mkString("\n")+"</gpx>"	
+    }
 
 
 	//TODO : Prendre des sous ensembles au hasard et construire le profil de proba de chacun d'entre eux pour cracher une sorte de courbe...
