@@ -4,7 +4,7 @@ package org.messagedelanuitdestemps.anglestest
 import math._
 import scala.io.Source
 import scala.util.Random
-
+import scala.collection.mutable.HashMap
 
 
 class GpsPoint(csvLine: String) extends Cloneable {
@@ -59,7 +59,11 @@ class GpsPoint(csvLine: String) extends Cloneable {
 		val latRandom  = if(Random.nextInt < 0) -randomBetween(minDeg,maxDeg) else randomBetween(minDeg,maxDeg)
 		this.longitude = this.longitude + longRandom
 		this.latitude  = this.latitude  + latRandom
+		this.latRadian = latitude.toRadians
+		this.coslat    = cos(latitude.toRadians)
+		this.sinlat    = sin(latitude.toRadians)
 		this.name = "_RANDOMIZED_"+this.name
+		memoAngle = HashMap.empty[GpsPoint, Double] //reset du cache, this a changé
 	}
 
 	def angle45 ( otherObjet : GpsPoint  ) : (Double, Double) = {
@@ -75,45 +79,68 @@ class GpsPoint(csvLine: String) extends Cloneable {
     def simpleDistance(point: GpsPoint) = {
         val R = 6367.532
         val pi = 3.141592653589793
-        val phi1 = latitude.toRadians
-        val phi2 = point.latitude.toRadians
-        val deltaPhi = phi2 - phi1
+        //val phi1 = latitude.toRadians
+        //val phi2 = point.latitude.toRadians
+        val deltaPhi = point.coslat - this.coslat
         val deltaLambda = (point.longitude - longitude).abs.toRadians
-        val a = sin(deltaPhi / 2) * sin(deltaPhi / 2) + cos(phi1) * cos(phi2) * sin(deltaLambda / 2) * sin(deltaLambda / 2)
+        val a = sin(deltaPhi / 2) * sin(deltaPhi / 2) + this.coslat * point.coslat * sin(deltaLambda / 2) * sin(deltaLambda / 2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         R * c
     }
     
+
+//TODO : memoizer simpleAngle
+
+    /*private*/ var memoAngle : HashMap[GpsPoint, Double] = HashMap.empty[GpsPoint, Double]
+    var latRadian : Double = 0.0
+    var coslat    : Double = 0.0
+    var sinlat    : Double = 0.0
+    
+	
     def simpleAngle(point: GpsPoint) : Double = {		
         def roundAt(p: Int)(n: Double): Double = { val s = math pow (10, p); (math round n * s) / s }
-		val phi1 = latitude.toRadians
-		val phi2 = point.latitude.toRadians
+	//NOTE: C'est plus rentable de faire le calcul, le hash prend un temps fou !
+	// Probablement un max de cache miss...
+	//if (memoAngle.contains(point)) {
+	//	memoAngle(point)
+	//} else {
+		//println("calcul angle")
+		//val phi1 = latitude.toRadians
+		//val phi2 = point.latitude.toRadians
 		var deltaLambda = (point.longitude-longitude).toRadians
-		var y = sin(deltaLambda) * cos(phi2);
-		var x = cos(phi1)*sin(phi2) - sin(phi1)*cos(phi2)*cos(deltaLambda);
+		var y = sin(deltaLambda) * point.coslat;
+		var x = this.coslat*point.sinlat - sinlat*point.coslat*cos(deltaLambda);
 		var theta = (360 + atan2(y, x).toDegrees) % 360;
 		val angle45c = if (theta  % 90 > 45)   90 - (theta % 90) else theta % 90
+	//	memoAngle += (point -> roundAt(2)(angle45c)) 
 		roundAt(2)(angle45c)
-	}
+	//}
+    }
 
     def parseCsvLine(s: String) = {
 		//println(s.replaceAll(",", "."))
         val regex = "([_\\w-]+)\\s+(\\d+\\.\\d+)\\s+N\\s+([\\d-]+\\.\\d+)\\s*".r
         val list = regex.findAllIn(s).matchData.toList.head.subgroups
-        this.latitude = list(1).toDouble
-	   this.longitude = list.last.toDouble
-	   this.name =  list.head
+	this.latitude = list(1).toDouble
+	this.longitude = list.last.toDouble
+	this.name =  list.head
+	this.latRadian = latitude.toRadians
+	this.coslat    = cos(latitude.toRadians)
+	this.sinlat    = sin(latitude.toRadians)
     }
 
    def fromDecimalGPSPoint(s: String) = {
 	   println(s)
-        val regex = """(.+?)(?:\s*,\s*)(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
-	try {
-        val list = regex.findAllIn(s).matchData.toList.head.subgroups
-        this.latitude = list(1).toDouble
-	   this.longitude = list.last.toDouble
-	   this.name =  list.head
-	} catch { case e : Throwable => println("Regexp Failed: '"+ s+"'")}
+	   val regex = """(.+?)(?:\s*,\s*)(\d+\.\d+)\s*,\s*([\d-]+\.\d+)\s*""".r
+	   try {
+		   val list = regex.findAllIn(s).matchData.toList.head.subgroups
+		   this.latitude = list(1).toDouble
+		   this.longitude = list.last.toDouble
+		   this.name =  list.head
+		   this.latRadian = latitude.toRadians
+		   this.coslat    = cos(latitude.toRadians)
+		   this.sinlat    = sin(latitude.toRadians)
+	   } catch { case e : Throwable => println("Regexp Failed: '"+ s+"'")}
     }
 
    private def precisionTo(val1 : Double, val2 : Double, precision : Double) : Boolean = {
