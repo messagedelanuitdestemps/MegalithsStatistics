@@ -3,10 +3,11 @@ package org.messagedelanuitdestemps.anglestest
 
 import math._
 import scala.io.Source
+import scala.util.Random
 
 
 
-class GpsPoint(csvLine: String) {
+class GpsPoint(csvLine: String) extends Cloneable {
     var position: (Double, Double, String) = (0.0,0.0,"")//parseCsvLine(csvLine)
     var latitude: Double = position._1
     var longitude: Double = position._2
@@ -48,6 +49,17 @@ class GpsPoint(csvLine: String) {
 		val val_acos = num_acos/den_acos
 		val acosfinal = if (val_acos >= 0) atan(sqrt(1-val_acos*val_acos)/val_acos) else Pi + atan(sqrt(1-val_acos*val_acos)/val_acos)
 		180*acosfinal/Pi
+	}
+
+
+	def randomizePosition(minDeg : Double, maxDeg : Double) = {
+		Random.setSeed(((random*1024561)*100).toLong)
+		def randomBetween(minDeg : Double, maxDeg : Double) : Double = { minDeg + (Random.nextDouble)*(maxDeg - minDeg)}
+		val longRandom = if(Random.nextInt < 0) -randomBetween(minDeg,maxDeg) else randomBetween(minDeg,maxDeg)
+		val latRandom  = if(Random.nextInt < 0) -randomBetween(minDeg,maxDeg) else randomBetween(minDeg,maxDeg)
+		this.longitude = this.longitude + longRandom
+		this.latitude  = this.latitude  + latRandom
+		this.name = "_RANDOMIZED_"+this.name
 	}
 
 	def angle45 ( otherObjet : GpsPoint  ) : (Double, Double) = {

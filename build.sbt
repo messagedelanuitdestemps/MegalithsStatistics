@@ -14,6 +14,7 @@ libraryDependencies ++= {
     //"com.thenewmotion.akka" %% "akka-rabbitmq" % "2.3",
      "ch.qos.logback" % "logback-classic" % "1.1.7"
     ,"com.github.jpbetz" % "subspace" % "0.1.0"
+    ,"org.scalaz" %% "scalaz-core" % "7.2.27"
     //,"org.eclipse.tycho" % "org.eclipse.jdt.core" % "3.9.0.v20130313-2254" 
     //    "com.madhukaraphatak" %% "java-sizeof" % "0.1"
   )

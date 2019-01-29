@@ -4,10 +4,13 @@ import scala.io.Source
 import scala.util.Random
 import scala.math.random
 import Math._
+import scalaz.Memo
+import scala.collection.mutable._
 
 class CollectionGpsPoints(csvFile: String) {
    // val gpsPoints: List[GpsPoint] = Source.fromFile(csvFile).getLines().toList.map {e => new GpsPoint(e)}
     var gpsPoints: List[GpsPoint] = csvFile.split("\n").filter( _.size >0).map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}.toList
+    var gpsPointsBackup : List[GpsPoint] = List.empty
 
 
 	val listeAngleRemarquables = List(0.0, 90.0, 45.0, 26.56, 18.43, 14.04, 11.31, 9.46, 8.13, 7.12, 6.34, 33.69, 30.96, 38.66, 35.54, 36.87, 22.62, 16.26)
@@ -39,29 +42,47 @@ class CollectionGpsPoints(csvFile: String) {
 			 precisionTo(ang,36.87,precision) || precisionTo(ang,22.62,precision) || precisionTo(ang,16.26,precision) )
 	}
 
-	private def combinatoire ( n : BigDecimal, p : BigDecimal) : BigDecimal= {
-			//println("Cn=%f p=%f".format(n,p))
-			def fact(n : BigDecimal) : BigDecimal = { 
-					var result : BigDecimal = 1;
-					for (i  <- 1 to n.toInt) {
-						   result *= i;
-    					}
-    					result
+
+	var memoFact : ArrayBuffer[BigDecimal] = new ArrayBuffer[BigDecimal](60000)
+
+	def fact(n : BigDecimal) : BigDecimal =   { 
+		var result : BigDecimal = 1
+	// memoization à l'ancienne
+		if (memoFact(n.toInt) > 0) memoFact(n.toInt) else {
+			println("calcul")
+			for (i  <- 1 to n.toInt) {
+				result *= i;
+				memoFact(i) = result;
 			}
-			fact(n)/(fact(n-p)*fact(p))
+			memoFact(n.toInt) = result
+			result
+		}
+	}
+	// Init
+	(1 to 60000).foreach { _ => memoFact += BigDecimal(0)}
+	fact(5000)
+
+
+	private def combinatoire ( n : BigDecimal, p : BigDecimal) : BigDecimal= {
+		//println("Cn=%f p=%f".format(n,p))
+
+		fact(n)/(fact(n-p)*fact(p))
 	}
 
 
-	def monteCarloAllCombs(tailleTab : Int, tailleMaxNbrSousListes : Int, precision : Double) : List[Int] = {
+	def monteCarloAllCombs(tailleTab : Int, maxNbrSousListes : Int, precision : Double) : List[Double] = {
 		val agps = gpsPoints.toArray
 		val rand = new Random(random.toInt)
 		def construireUneListeTaille(taille : Int) : List[GpsPoint]= {
 			val listeUniq = (1 to taille*5).map { i => rand.nextInt(gpsPoints.length) }.distinct.take(taille).toList
 			listeUniq.map {i => agps.apply(i)}
 		}
-
-		(1 to tailleMaxNbrSousListes).par.map { _ =>
-			calcNombreAnglesRemarquablesForListe(construireUneListeTaille(tailleTab), precision)
+		val tailleListeAngleRemarquables = listeAngleRemarquables.size
+		(1 to maxNbrSousListes).par.map { _ =>
+			val megListe = construireUneListeTaille(tailleTab)
+			val resProba = calcProba(calcNombreAnglesRemarquablesForListe(megListe, precision),tailleTab,tailleListeAngleRemarquables,precision)
+			if (resProba < pow(10,-10)) println(megListe)
+			resProba
 		}.toList
 	}
 
@@ -76,8 +97,12 @@ class CollectionGpsPoints(csvFile: String) {
 
 	def calcNombreAnglesRemarquablesForListe( myList : List[GpsPoint], precision :  Double) : Int = {
 		val iPoints = myList.zipWithIndex
-		(for {i <- iPoints; j <- iPoints if i._2 < j._2} yield List(testAngles(i._1.simpleAngle(j._1), precision), testAngles(j._1.simpleAngle(i._1), precision)))
-		.flatten.filter{ e => e }.size
+		var countAnglesOk = 0
+		for {i <- iPoints; j <- iPoints if i._2 < j._2} yield {
+			countAnglesOk = countAnglesOk + (if (testAngles(i._1.simpleAngle(j._1), precision)) 1 else 0)
+			countAnglesOk = countAnglesOk + (if (testAngles(j._1.simpleAngle(i._1), precision)) 1 else 0)
+		}
+		countAnglesOk
 	}
 
 
@@ -95,15 +120,16 @@ class CollectionGpsPoints(csvFile: String) {
 // private[this] 
 
 	def calcProba(nbrDoubletMesureAngleRemarquables : Int, nbmglt : Int, nbAnglRmq : Int, precision : Double) : Double = {
+		var sum : BigDecimal = 0
 		val nbm = (nbmglt*nbmglt - nbmglt).toDouble/2
 		val fp2p1 = nbAnglRmq*precision
 		val fp2  = (fp2p1/(45+precision))*(2 - fp2p1/(45+precision))
-		val probs = (0 to nbrDoubletMesureAngleRemarquables).par.map { i : Int => 
+		val probs = (0 to nbrDoubletMesureAngleRemarquables).foreach { i : Int => 
 			val res = combinatoire(nbm.toLong, i) * scala.math.pow(fp2, i.toDouble) * scala.math.pow(1.0 - fp2, (nbm - i))
 			//println(res)
-			res
-		}.sum
-		1 - probs.toDouble
+			sum = sum + res
+		}
+		1 - sum.toDouble
 	}
 
      def calcProbaForAllThis(precision : Double) : Double = {
@@ -118,12 +144,13 @@ class CollectionGpsPoints(csvFile: String) {
 		}.toList
      }
 
-     def calcProbaForSubGroupMonteCarlo(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int) : List[Double] = {
+    /* def calcProbaForSubGroupMonteCarlo(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int) : List[Double] = {
+		val tailleListeAngleRemarquables = listeAngleRemarquables.size
 		monteCarloAllCombs(tailleEchantillon,tailleMaxATester, precision).map {
-			subgrp =>
-			 calcProba(subgrp, tailleEchantillon, listeAngleRemarquables.size, precision)
+			nbrAnglRmqGrp =>
+			 calcProba(nbrAnglRmqGrp, tailleEchantillon, tailleListeAngleRemarquables, precision)
 		}
-     }
+     }*/
 
      def genereRandomizedCollection(taille : Int) = {
 	     //println("%s %f N %f".format("toto", random*4 +42 , random*4 - 2 ))
@@ -131,25 +158,37 @@ class CollectionGpsPoints(csvFile: String) {
 		 .split("\n").toList.map {e => val o = new GpsPoint(""); o.fromDecimalGPSPoint(e); o}
      }
 
+     def randomizedThisCollection(minDeg : Double, maxDeg : Double) = {
+	this.gpsPointsBackup = this.gpsPoints
+	this.gpsPoints = this.gpsPoints.map {e => e.randomizePosition(minDeg,maxDeg); e }
+     }
 
 
 
-    def compareProfilAvecGroupeControle(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int) : List[(Double, Double,Double)] = {
+     override def clone : CollectionGpsPoints = {
+	     val o = new CollectionGpsPoints("")
+		     o.gpsPoints = this.gpsPoints
+		     o
+     } 
+
+    def compareProfilAvecGroupeControle(precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
 		// 1. on lance le Monte-Carlo
-		val testMegalithOk = this.calcProbaForSubGroupMonteCarlo(precision, tailleEchantillon, tailleMaxATester)
+		val testMegalithOk = this.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
 		// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
-		val grpControl = new CollectionGpsPoints("")
-		grpControl.genereRandomizedCollection(this.gpsPoints.size)
-		val testGroupeControl = grpControl.calcProbaForSubGroupMonteCarlo(precision, tailleEchantillon, tailleMaxATester)
+		val grpControl = this.clone
+		grpControl.randomizedThisCollection(minDegRandomization,maxDeg) //genereRandomizedCollection(this.gpsPoints.size)
+		val testGroupeControl = grpControl.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
+		this.gpsPoints = grpControl.gpsPointsBackup // Le clone a l'air de déconner, par ref ?
 
 		println("")
-		// 3. On battit un petit histogramme.
-		val buglst = (1 to 4).toList
+		// 3. On batit un petit histogramme.
+		val buglst = (1 to 11).toList
 		println(buglst)
 		val basepcent = 100.0/tailleMaxATester
 		buglst.map{ i : Int =>  
 				val exposant = pow(10,-i.toDouble)
-				println(" %d vs %d ".format(testMegalithOk.filter( _ < exposant).size, testGroupeControl.filter( _ < exposant).size))
+				println("Groupe testé vs groupe de contrôle")
+				println("%.10f :   %d vs        %d ".format(exposant, testMegalithOk.filter( _ < exposant).size, testGroupeControl.filter( _ < exposant).size))
 				(exposant, (basepcent*testMegalithOk.filter( _ < exposant).size), (basepcent*testGroupeControl.filter( _ < exposant).size))
 			     }
     }

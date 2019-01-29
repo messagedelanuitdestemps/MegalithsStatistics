@@ -52,15 +52,18 @@ def combinatoire ( n : BigDecimal, p : BigDecimal) : BigDecimal= {
 import scala.xml._
 //\"desc\": \"%s\", \"lat\":\"%s\", \"lon\":\"%s\"
 
-val mens = (XML.loadFile("osmMenhirs.xml") \ "wpt").map { e => ( "%s, %s, %s".format( (e \("cmt")).text,  e \@("lat"),  e \@("lon")))}.mkString("\n")
+def loadGpx(filename : String) : String =  (XML.loadFile(filename) \ "wpt").map { e => ( "%s, %s, %s".format( (e \("cmt")).text,  e \@("lat"),  e \@("lon")))}.mkString("\n")
 
-val menhirs = new CollectionGpsPoints(mens)
+//val menhirs = new CollectionGpsPoints(loadGpx())
 
 
 import java.util.Locale
 def printJsonForPrecision(menhirs : CollectionGpsPoints, precision : Double) = 
 println("["+menhirs.allCombinations(2).toList.flatMap{ e => val m1 = e.apply(0); val m2 = e.apply(1)
 							if (m1.isAngleRemarquable(m2,precision) && m1.simpleDistance(m2) < 48) Some("[ %1.6f, %1.6f],[%1.6f,%1.6f]".formatLocal(Locale.US, m1.latitude, m1.longitude,  m2.latitude, m2.longitude)) else None}.mkString(" ], [ ")+"]")
+
+
+val basque = new CollectionGpsPoints(loadGpx("menhirsBasque.xml"))
 /**
 select st_astext(ST_SnapToGrid( ST_SetSRID(point, 4326), 1, 1)), array_agg(st_astext(point))
 , count(point)
