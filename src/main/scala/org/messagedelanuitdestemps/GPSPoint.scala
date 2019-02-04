@@ -1,11 +1,11 @@
-package org.messagedelanuitdestemps.anglestest
+package org.messagedelanuitdestemps
 
 
 import math._
 import scala.io.Source
 import scala.util.Random
 import scala.collection.mutable.HashMap
-
+//import org.messagedelanuitdestemps.Vector3
 
 class GpsPoint(csvLine: String) extends Cloneable {
     var position: (Double, Double, String) = (0.0,0.0,"")//parseCsvLine(csvLine)

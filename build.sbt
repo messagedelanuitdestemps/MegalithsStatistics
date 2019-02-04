@@ -13,8 +13,8 @@ libraryDependencies ++= {
   Seq(
     //"com.thenewmotion.akka" %% "akka-rabbitmq" % "2.3",
      "ch.qos.logback" % "logback-classic" % "1.1.7"
-    ,"com.github.jpbetz" % "subspace" % "0.1.0"
-    ,"org.scalaz" %% "scalaz-core" % "7.2.27"
+    //,"com.github.jpbetz" % "subspace" % "0.1.0"
+    //,"org.scalaz" %% "scalaz-core" % "7.2.27"
     ,"org.scala-lang.modules" %% "scala-xml" % "1.1.1"
     //,"org.eclipse.tycho" % "org.eclipse.jdt.core" % "3.9.0.v20130313-2254" 
     //    "com.madhukaraphatak" %% "java-sizeof" % "0.1"
@@ -29,7 +29,7 @@ credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 publishArtifact in(Compile, packageBin) := false
 
 // main class for default package phase
-mainClass in(Compile, run) := Some("org.messagedelanuitdestemps.anglestest.MenhirCombis")
+mainClass in(Compile, run) := Some("org.messagedelanuitdestemps.MenhirCombis")
 
 // merge strategy for assembly (2 files or class with same name + location)
 val customMergeStrategy: String => MergeStrategy = {
@@ -75,7 +75,7 @@ addArtifact(artifact in(Compile, assembly), assembly)
 
 releaseIgnoreUntrackedFiles := true
 // assembly main class
-mainClass in assembly := Some("org.messagedelanuitdestemps.anglestest.MenhirCombis")
+mainClass in assembly := Some("org.messagedelanuitdestemps.MenhirCombis")
 
 //release process -> dont publish artifact
 releaseProcess := Seq[ReleaseStep](
