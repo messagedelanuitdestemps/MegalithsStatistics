@@ -6,6 +6,7 @@ import scala.math.random
 import Math._
 //import scalaz.Memo
 import scala.collection.mutable._
+import scala.collection.parallel.CollectionConverters._ 
 //import scalaz._, Scalaz._
 import scala.xml._
 //import org.messagedelanuitdestemps.MyImplicits._
@@ -87,6 +88,9 @@ class CollectionGpsPoints(csvFile: String) {
 
 
 
+
+
+
 	def monteCarloAllCombs(tailleTab : Int, maxNbrSousListes : Int, precision : Double) : List[Double] = {
 		val agps = gpsPoints.toArray
 		val rand = new Random((random*random*78668787).toInt)
@@ -109,6 +113,7 @@ class CollectionGpsPoints(csvFile: String) {
 			// On fusionne construireUneListeTaille et calcNombreAnglesRemarquablesForListe, et pour chaque i,j, il calcul
 			// makeFactor(i,j,gpsPoints.size), et va chercher dans le Array[Boolean] si cet angle est remarquable ou non. Si oui, il le compte
 			val (megListe,nbAnglesRmqTrouves) = makeGpsPointRandomListAndCountMatchingAngles(agps,tailleTab,nbit,precision)
+      //if(nbAnglesRmqTrouves > 0) println(nbAnglesRmqTrouves)
 			listNbAnglRmqTrouves += nbAnglesRmqTrouves 
 			val resProba = calcProba(nbAnglesRmqTrouves,tailleTab,tailleListeAngleRemarquables,precision)
 	
@@ -118,6 +123,43 @@ class CollectionGpsPoints(csvFile: String) {
 			resProba
 		}.toList
 	}
+
+
+
+// Passage à la méthode Gaussienne : Pour chaque sous échantillon, on compte combien on en trouve
+  
+
+  def monteCarloAllCombsHistogram(tailleTab : Int, maxNbrSousListes : Int, precision : Double) : Array[Int] = {
+		val agps = gpsPoints.toArray
+		val rand = new Random((random*random*78668787).toInt)
+		val nbit = (log(gpsPoints.size.toDouble)/log(2)).toInt+1
+
+		def construireUneListeTaille(taille : Int) : List[GpsPoint]= {
+			val listeUniq = (1 to taille*5).map { i => rand.nextInt(gpsPoints.length) }.distinct.take(taille).toList
+			listeUniq.map {i => agps.apply(i)}
+		}
+
+
+		val tailleListeAngleRemarquables = listeAngleRemarquables.size
+
+		val countAnglBrut = (1 to maxNbrSousListes).par.map { i =>
+				//if ((random*random*78668787).toInt % 4567 == 0)
+				val p = ((100.0/maxNbrSousListes)*i*10000).toInt
+			if (p> 100000 && p % 100000 == 0) println(p/10000+"% effectué (modulo parallelisme)")
+
+			// on prend gpsPoints.toArray, et on construit le Array[Boolean] de taille pow(2,2*((log(gpsPoints.size.toDouble)/log(2)).toInt+1))
+			// On fusionne construireUneListeTaille et calcNombreAnglesRemarquablesForListe, et pour chaque i,j, il calcul
+			// makeFactor(i,j,gpsPoints.size), et va chercher dans le Array[Boolean] si cet angle est remarquable ou non. Si oui, il le compte
+			val (megListe,nbAnglesRmqTrouves) = makeGpsPointRandomListAndCountMatchingAngles(agps,tailleTab,nbit,precision)
+			listNbAnglRmqTrouves += nbAnglesRmqTrouves
+      //if(nbAnglesRmqTrouves > 0) println(nbAnglesRmqTrouves)
+      nbAnglesRmqTrouves
+		}.toList
+    var histo = new Array[Int](512)
+    countAnglBrut.foreach{ e => histo(e) = histo(e) +1}
+    histo
+	}
+
 
 
 
@@ -207,8 +249,8 @@ class CollectionGpsPoints(csvFile: String) {
      }
 
      def randomizedThisCollection(minDeg : Double, maxDeg : Double) = {
-	this.gpsPointsBackup = this.gpsPoints
-	this.gpsPoints = this.gpsPoints.map {e => e.randomizePosition(minDeg,maxDeg); e }
+	    this.gpsPointsBackup = this.gpsPoints
+	    this.gpsPoints = this.gpsPoints.map {e => e.randomizePosition(minDeg,maxDeg); e }
      }
 
 
@@ -220,130 +262,189 @@ class CollectionGpsPoints(csvFile: String) {
      }
 
     def updateMeilleur(lis : List[(GpsPoint,Int)]) = {
+		
+		
+      def rightJoinOn[A,B]( l1 : List[A], l2 : List[B], pred : (A,B) => Boolean ) : List[(Option[A],B)] = {
+        if (l1.size == 0 && l2.size > 0)
+          l2.map { e => (None,e) }
+        else {
+          val res1 = for { b <- l2; a <- l1  } yield if (pred(a,b)) { (Some(a),b) } else {(None,b)}
+          res1.flatMap { case (a,b) => if (! a.isDefined && res1.exists{ case (c,d) =>  b == d && c.isDefined} ) { None } else Some((a,b)) }.distinct
+        }
+      }
 
+		
+      def joinMeilleurs( a : (GpsPoint,Int), b : (GpsPoint,Int)) : Boolean = { a._1 == b._1 }
 
-	    def rightJoinOn[A,B]( l1 : List[A], l2 : List[B], pred : (A,B) => Boolean ) : List[(Option[A],B)] = {
-		    if (l1.size == 0 && l2.size > 0)
-			    l2.map { e => (None,e) }
-		    else {
-			    val res1 = for { b <- l2; a <- l1  } yield if (pred(a,b)) { (Some(a),b) } else {(None,b)}
-			    res1.flatMap { case (a,b) => if (! a.isDefined && res1.exists{ case (c,d) =>  b == d && c.isDefined} ) { None } else Some((a,b)) }.distinct
-                  }
-                }
-	
-
-	def joinMeilleurs( a : (GpsPoint,Int), b : (GpsPoint,Int)) : Boolean = { a._1 == b._1 }
-	if (listeGpsPointPlusCites.size == 0)
-		this.listeGpsPointPlusCites = lis
-	else {
-		this.listeGpsPointPlusCites = rightJoinOn(listeGpsPointPlusCites,lis, joinMeilleurs ).map{case (Some((g1,n1)),(g2,n2))  => (g1,n1+n2) 
-													  case (None, (g2,n2)  ) => (g2, n2) 
-												  	  }		
-	}
+      if (listeGpsPointPlusCites.size == 0)
+        this.listeGpsPointPlusCites = lis
+      else {
+        this.listeGpsPointPlusCites = rightJoinOn(listeGpsPointPlusCites,lis, joinMeilleurs ).map{case (Some((g1,n1)),(g2,n2))  => (g1,n1+n2) 
+          case (None, (g2,n2)  ) => (g2, n2) 
+        }		
+      }
     }
 
     def saveStatsAnglesRmqToSQLandEmptyIt(filename : String, idRun : Int,  isEchantillonVraiMegaliths : Boolean, tailles : (Int,Int) ) = {
-		val str = "," + this.listNbAnglRmqTrouves.map { e => "(%d,%d,%d,%b, %d)".formatLocal(java.util.Locale.US,idRun,tailles._1, tailles._2,isEchantillonVraiMegaliths,e)}.mkString(",")
-		Files.write(Paths.get(filename), str.getBytes(),StandardOpenOption.APPEND);
-		this.listNbAnglRmqTrouves.clear
+		  val str = "," + this.listNbAnglRmqTrouves.map { e => "(%d,%d,%d,%b, %d)".formatLocal(java.util.Locale.US,idRun,tailles._1, tailles._2,isEchantillonVraiMegaliths,e)}.mkString(",")
+		  Files.write(Paths.get(filename), str.getBytes(),StandardOpenOption.APPEND);
+		  this.listNbAnglRmqTrouves.clear
     }
 
 
-    def compareProfilAvecGroupeControle(xmlsrc : String, precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
+    def compareProfilAvecGroupeControle(xmlsrc : String, precision : Double, tailleEchantillon : Int, 
+                                        maxNbrSousListes : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
 		// 1. on lance le Monte-Carlo
-		val idRun = java.util.UUID.randomUUID.getLeastSignificantBits().toInt.abs
-		val testMegalithOk = this.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
-		this.saveStatsAnglesRmqToSQLandEmptyIt(xmlsrc+"-statsAnglesRmqTrouves.sql",idRun,true, (tailleEchantillon, tailleMaxATester))
+				val idRun = java.util.UUID.randomUUID.getLeastSignificantBits().toInt.abs
+				val testMegalithOk = this.monteCarloAllCombs( tailleEchantillon, maxNbrSousListes, precision)
+				this.saveStatsAnglesRmqToSQLandEmptyIt(xmlsrc+"-statsAnglesRmqTrouves.sql",idRun,true, (tailleEchantillon, maxNbrSousListes))
+				
+				// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
 		
-		// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
-
-		val grpControl = new CollectionGpsPoints(loadGpx(xmlsrc))
-		grpControl.randomizedThisCollection(minDegRandomization,maxDeg) //genereRandomizedCollection(this.gpsPoints.size)
-		grpControl.precomputeAngleTest(precision)
-		val testGroupeControl = grpControl.monteCarloAllCombs( tailleEchantillon, tailleMaxATester, precision)
-		grpControl.saveStatsAnglesRmqToSQLandEmptyIt(xmlsrc+"-statsAnglesRmqTrouves.sql",idRun,false,(tailleEchantillon, tailleMaxATester))
+				val grpControl = new CollectionGpsPoints(loadGpx(xmlsrc))
+				grpControl.randomizedThisCollection(minDegRandomization,maxDeg) //genereRandomizedCollection(this.gpsPoints.size)
+				grpControl.precomputeAngleTest(precision)
+				val testGroupeControl = grpControl.monteCarloAllCombs( tailleEchantillon, maxNbrSousListes, precision)
+				grpControl.saveStatsAnglesRmqToSQLandEmptyIt(xmlsrc+"-statsAnglesRmqTrouves.sql",idRun,false,(tailleEchantillon, maxNbrSousListes))
+				
+				if (random > 0.95) {
+					val gmeilleur = grpControl.listeListLowProba.flatten.distinct.map { e=> (e,grpControl.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse
+					grpControl.listeGpsPointPlusCites = gmeilleur
+					println(gmeilleur)
+				}
 		
-		if (random > 0.95) {
-			val gmeilleur = grpControl.listeListLowProba.flatten.distinct.map { e=> (e,grpControl.listeListLowProba.flatten.count( _ == e)) }.sortBy { case (a,b) => b}.reverse
-			grpControl.listeGpsPointPlusCites = gmeilleur
-			println(gmeilleur)
-		}
-
-		println("")
-		// 3. On batit un petit histogramme.
-		val basepcent = 100.0/tailleMaxATester
-		val result = 
-			(List(0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2) ++ (1 to 11).toList.map {i => pow(10,-i.toDouble) }).map{ proba : Double =>  
-				//val proba = pow(10,-i.toDouble)
-				//TODO où est la médiane ?
-				println("Groupe testé vs groupe de contrôle")
-				println("%.10f :   %d vs        %d ".format(proba, testMegalithOk.filter( _ < proba).size, testGroupeControl.filter( _ < proba).size))
-				(proba, (basepcent*testMegalithOk.filter( _ < proba).size), (basepcent*testGroupeControl.filter( _ < proba).size))
-			     }
-		val infos = "%.4f;%d;%d;".formatLocal(java.util.Locale.US,precision, tailleEchantillon, tailleMaxATester)
-		val str = infos + result.map { e => "%.11f; %.6f; %.6f".formatLocal(java.util.Locale.US,e._1, e._2, e._3) }.mkString(";")+"\n"
-
-		Files.write(Paths.get(xmlsrc+".csv"), str.getBytes(),StandardOpenOption.APPEND);
-		result
+				println("")
+				// 3. On batit un petit histogramme.
+				val basepcent = 100.0/maxNbrSousListes
+				val result = 
+					(List(0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2) ++ (1 to 11).toList.map {i => pow(10,-i.toDouble) }).map{ proba : Double =>  
+						//val proba = pow(10,-i.toDouble)
+						//TODO où est la médiane ?
+						println("Groupe testé vs groupe de contrôle")
+						println("%.10f :   %d vs        %d ".format(proba, testMegalithOk.filter( _ < proba).size, testGroupeControl.filter( _ < proba).size))
+						(proba, (basepcent*testMegalithOk.filter( _ < proba).size), (basepcent*testGroupeControl.filter( _ < proba).size))
+					     }
+				val infos = "%.4f;%d;%d;".formatLocal(java.util.Locale.US,precision, tailleEchantillon, maxNbrSousListes)
+				val str = infos + result.map { e => "%.11f; %.6f; %.6f".formatLocal(java.util.Locale.US,e._1, e._2, e._3) }.mkString(";")+"\n"
+		
+				Files.write(Paths.get(xmlsrc+".csv"), str.getBytes(),StandardOpenOption.APPEND);
+				result
      
     }
+
+    // Histogramme
+     def compareProfilAvecGroupeControleHistogram(xmlsrc : String, run : Int, xprienceID : Long, precision : Double, tailleEchantillon : Int, 
+                                        maxNbrSousListes : Int, minDegRandomization : Double, maxDeg : Double) : String = {
+		// 1. on lance le Monte-Carlo
+				val idRun = java.util.UUID.randomUUID.getLeastSignificantBits().toInt.abs
+				val testMegalithOk = this.monteCarloAllCombsHistogram( tailleEchantillon, maxNbrSousListes, precision)
+				
+				// 2. On génère un nouvel objet CollectionGpsPoints de la même taille, on lance le Monte-Carlo
+		
+				val grpControl = new CollectionGpsPoints(loadGpx(xmlsrc))
+				grpControl.randomizedThisCollection(minDegRandomization,maxDeg) //genereRandomizedCollection(this.gpsPoints.size)
+				grpControl.precomputeAngleTest(precision)
+				val testGroupeControl = grpControl.monteCarloAllCombsHistogram( tailleEchantillon, maxNbrSousListes, precision)
+			
+        // 3. On a deux Histogrammes, on génère le CSV
+        // Create table tmpResultsEchantillons(uidrun text, nrun int, histoGenuine  Int[], histoRandomized Int[] );
+        // insert into ResultsEchantillons(idXp,nrun,histoGenuine,histoRandomized) values (1,1,'{1,2,3}'::int[]),(1,2,'{1,2,3}'::int[]);
+        // 
+        "(%d,%d,'{%s}'::int[], '{%s}'::int[])".format(xprienceID, run, testMegalithOk.mkString(","), testGroupeControl.mkString(","))
+				    
+        /*
+         Requête typique pour recap :
+         with maxs(n) as ( select generate_series(1,45)),
+         g(mx,n) as ( select maxs.n, generate_series(1,n) from maxs),
+ res1 as (
+  select id, g.mx, sum(histoGenuine[g.n]), sum(histoRandomized[g.n]), 100 - (100/12000.0)*sum(histoGenuine[g.n]) as "% g", 100 - (100/12000.0)*sum(histoRandomized[g.n]) as "% h" 
+  from ResultsEchantillons, g
+  where g.mx between 1 and 28
+  group by id, g.mx
+  order by id, g.mx)
+
+select  mx, avg("% g"), avg("% h") from res1 group by mx
+order by mx
+         */ 
+    }
+
 
     def loadGpx(filename : String) : String =  (XML.loadFile(filename) \ "wpt").map { e => ( "%s, %s, %s".format( (e \("cmt")).text,  e \@("lat"),  e \@("lon")))}.mkString("\n")
     
 
     def precomputeAngleTest(precision : Double) = {
-	val nbit = (log(this.gpsPoints.size.toDouble)/log(2)).toInt+1
-	val iPoints = this.gpsPoints.toArray
- 	var i: Int = 0
-   	var j: Int = 0
-	i = 0
-	while (i < iPoints.size) {
-		j = 0
-		while (j < i) {
-			this.isAngleRemarquableForCouple((i << nbit) + j) = /*(iPoints(i),iPoints(j),*/testAngles(iPoints(i).simpleAngle(iPoints(j)), precision)
-			this.isAngleRemarquableForCouple((j << nbit) + i) = /*(iPoints(j),iPoints(i),*/testAngles(iPoints(j).simpleAngle(iPoints(i)), precision)
+				val nbit = (log(this.gpsPoints.size.toDouble)/log(2)).toInt+1
+				val iPoints = this.gpsPoints.toArray
+			 	var i: Int = 0
+			   	var j: Int = 0
+				i = 0
+				while (i < iPoints.size) {
+					j = 0
+					while (j < i) {
+						this.isAngleRemarquableForCouple((i << nbit) + j) = /*(iPoints(i),iPoints(j),*/testAngles(iPoints(i).simpleAngle(iPoints(j)), precision)
+						this.isAngleRemarquableForCouple((j << nbit) + i) = /*(iPoints(j),iPoints(i),*/testAngles(iPoints(j).simpleAngle(iPoints(i)), precision)
+			
+						/*println("%s(%d) et %s(%d) ont pour la valeurs : %b && %b".format(iPoints(i).toString,(i << nbit) + j, iPoints(j).toString, (j << nbit) + i, 
+												 this.isAngleRemarquableForCouple((i << nbit) + j),
+												 this.isAngleRemarquableForCouple((j << nbit) + i) ));*/ { j += 1; j - 1 }
+					}
+					{ i += 1; i - 1 }
+				}
 
-			/*println("%s(%d) et %s(%d) ont pour la valeurs : %b && %b".format(iPoints(i).toString,(i << nbit) + j, iPoints(j).toString, (j << nbit) + i, 
-									 this.isAngleRemarquableForCouple((i << nbit) + j),
-									 this.isAngleRemarquableForCouple((j << nbit) + i) ));*/ { j += 1; j - 1 }
+    }
+
+    def runNProfiles(nbRun : Int,xmlsrc : String, precision : Double, tailleEchantillon : Int, maxNbrSousListes : Int,
+                      minDegRandomization : Double, maxDeg : Double, methodPierre : Boolean) : List[(Double, Double,Double)] = {
+	
+				precomputeAngleTest(precision)
+				Files.write(Paths.get(xmlsrc+".csv"), "".getBytes(), StandardOpenOption.CREATE)
+				Files.write(Paths.get(xmlsrc+"-statsAnglesRmqTrouves.sql"), 
+							"INSERT INTO statsAnglRmqTrouves(tailleGroupe,nbSougroupe,isEchantillonMegalithsReels,nbAnglTrouv) values\n".getBytes(),
+							StandardOpenOption.CREATE);
+			
+				val ress : List[List[(Double, Double,Double)]] = (1 to nbRun).map { i =>
+					println("Run n°%d".format(i))
+					//this.gpsPoints = (new CollectionGpsPoints(loadGpx(xmlsrc))).gpsPoints
+					this.compareProfilAvecGroupeControle(xmlsrc,precision,tailleEchantillon,maxNbrSousListes,minDegRandomization, maxDeg)
+					//List((1.0,2.0,3.0))
+				}.toList
+				val meilleur = this.listeListLowProba.par.flatten.distinct.map { e=> (e,this.listeListLowProba.flatten.count( _ == e)) }.toList.sortBy { case (a,b) => b}.reverse
+				this.listeGpsPointPlusCites = meilleur
+				println(this.listeGpsPointPlusCites.take(28).map { case (g,nb) => "('%s',%.6f, %.6f, %d)".formatLocal(java.util.Locale.US, g.name, g.longitude, g.latitude, nb)}.mkString(","))
+				//println(this.listeGpsPointPlusCites.take(28))
+				
+				
+			
+				(0 to 10).map { i => // Pour chaque coef
+				 val ec = (ress.map { e => e.apply(i)._2 }.sum)/nbRun
+				 val gc = (ress.map { e => e.apply(i)._3 }.sum)/nbRun
+				 (i.toDouble,ec,gc)
+				}.toList
+    }
+
+
+    def runNProfilesHistogram(nbRun : Int,xmlsrc : String, precision : Double, tailleEchantillon : Int, maxNbrSousListes : Int,
+                      minDegRandomization : Double, maxDeg : Double)  = {
+	
+				precomputeAngleTest(precision)
+				//Files.write(Paths.get(xmlsrc+".csv"), "".getBytes(), StandardOpenOption.CREATE)
+				Files.write(Paths.get(xmlsrc+"-statsAnglesRmqTrouvesHistogram.sql"), 
+							"insert into ResultsEchantillons(idXp,nrun,histoGenuine, histoRandomized) values\n".getBytes(),
+							StandardOpenOption.CREATE);
+			
+				 (1 to nbRun).map { i =>
+					println("Run n°%d".format(i))
+					var s = this.compareProfilAvecGroupeControleHistogram(xmlsrc,i,2,precision,tailleEchantillon,maxNbrSousListes,minDegRandomization, maxDeg)+","
+          if ( i % 13 == 0) s = s+"\n"
+          Files.write(Paths.get(xmlsrc+"-statsAnglesRmqTrouvesHistogram.sql"),s.getBytes(),StandardOpenOption.APPEND)
+				}
 		}
-		{ i += 1; i - 1 }
-	}
 
-    }
-
-    def runNProfiles(nbRun : Int,xmlsrc : String, precision : Double, tailleEchantillon : Int, tailleMaxATester : Int, minDegRandomization : Double, maxDeg : Double) : List[(Double, Double,Double)] = {
-	
-	precomputeAngleTest(precision)
-	Files.write(Paths.get(xmlsrc+".csv"), "".getBytes(), StandardOpenOption.CREATE)
-	Files.write(Paths.get(xmlsrc+"-statsAnglesRmqTrouves.sql"), 
-				"INSERT INTO statsAnglRmqTrouves(tailleGroupe,nbSougroupe,isEchantillonMegalithsReels,nbAnglTrouv) values\n".getBytes(),
-				StandardOpenOption.CREATE);
-
-	val ress : List[List[(Double, Double,Double)]] = (1 to nbRun).map { i =>
-		println("Run n°%d".format(i))
-		//this.gpsPoints = (new CollectionGpsPoints(loadGpx(xmlsrc))).gpsPoints
-		this.compareProfilAvecGroupeControle(xmlsrc,precision,tailleEchantillon,tailleMaxATester,minDegRandomization, maxDeg)
-		//List((1.0,2.0,3.0))
-	}.toList
-	val meilleur = this.listeListLowProba.par.flatten.distinct.map { e=> (e,this.listeListLowProba.flatten.count( _ == e)) }.toList.sortBy { case (a,b) => b}.reverse
-	this.listeGpsPointPlusCites = meilleur
-	println(this.listeGpsPointPlusCites.take(28).map { case (g,nb) => "('%s',%.6f, %.6f, %d)".formatLocal(java.util.Locale.US, g.name, g.longitude, g.latitude, nb)}.mkString(","))
-	//println(this.listeGpsPointPlusCites.take(28))
-	
-	
-
-	(0 to 10).map { i => // Pour chaque coef
-	 val ec = (ress.map { e => e.apply(i)._2 }.sum)/nbRun
-	 val gc = (ress.map { e => e.apply(i)._3 }.sum)/nbRun
-	 (i.toDouble,ec,gc)
-	}.toList
-    }
 
 
     def genereXmlMeilleur(nb : Int) : String = {
-	val l = this.listeGpsPointPlusCites.take(nb).map { case (g,n) => "<wpt lat=\"%f\" lon=\"%f\"><cmt>%s</cmt></wpt>".formatLocal(java.util.Locale.US,g.latitude,g.longitude,g.name)}
-	"<gpx>"+ l.mkString("\n")+"</gpx>"	
+	      val l = this.listeGpsPointPlusCites.take(nb).map { case (g,n) => "<wpt lat=\"%f\" lon=\"%f\"><cmt>%s</cmt></wpt>".formatLocal(java.util.Locale.US,g.latitude,g.longitude,g.name)}
+	      "<gpx>"+ l.mkString("\n")+"</gpx>"	
     }
 
 
